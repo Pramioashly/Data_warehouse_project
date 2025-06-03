@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 import plotly.express as px # Import Plotly Express
 
+st.set_page_config(layout="wide")
 # --- Configuration ---
 # Construct the path to the .env file, assuming it's in the project root
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -60,8 +61,7 @@ def load_data():
 
 df = load_data()
 
-# --- Dashboard Layout ---
-st.set_page_config(layout="wide")
+
 
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Dashboard Overview", "Geographical Analysis"])
