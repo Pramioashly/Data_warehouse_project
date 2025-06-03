@@ -3,3 +3,7 @@ streamlit
 sqlalchemy
 psycopg2-binary   # If using PostgreSQL
 psycopg2
+pandas
+SQLAlchemy
+python-dotenv
+plotly
