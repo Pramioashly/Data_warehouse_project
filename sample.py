@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-from sqlalchemy import create_engine, text
+import plotly.express as px # Corrected alias to px
+from sqlalchemy import create_engine, text # Import text from sqlalchemy
 import os
 from dotenv import load_dotenv
 
@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 DATABASE_URL = os.getenv("EXTERNAL_DATABASE_URL")
 
-@st.cache_data(ttl=3600)
+# Use st.cache_resource for caching the database engine
+@st.cache_resource(ttl=3600)
 def get_database_engine():
     """Establishes and returns a SQLAlchemy engine for database connection."""
     if not DATABASE_URL:
@@ -20,7 +21,7 @@ def get_database_engine():
         # Test connection
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        st.success("Successfully connected to the database!") # Add a success message
+        st.success("Successfully connected to the database!")
         return engine
     except Exception as e:
         st.error(f"Error connecting to the database: {e}")
@@ -51,7 +52,7 @@ def main():
 
     # --- Navigation Sidebar ---
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Sales Overview", "View Datasets"]) # Moved inside main()
+    page = st.sidebar.radio("Go to", ["Sales Overview", "View Datasets"])
 
     # Load data once at the start of main()
     fact_sales, dim_customer, dim_product = load_data()
@@ -59,11 +60,8 @@ def main():
     # Centralized check for empty dataframes
     if fact_sales.empty or dim_customer.empty or dim_product.empty:
         st.warning("No data available to display. Please check database connection and ensure data has been loaded using `load.py`.")
-        # If no data, stop here for charts and dataset view will show empty.
-        # No need for st.stop() or return pd.DataFrame() inside the if page == "Sales Overview" block
-        # as the warning handles it.
-        if page == "Sales Overview": # Only show this for the dashboard view
-            return # Exit main if no data and on sales overview page
+        if page == "Sales Overview":
+            return
 
     if page == "Sales Overview":
         st.header("Sales Overview")
@@ -73,11 +71,9 @@ def main():
         sales_data = pd.merge(sales_data, dim_product, on='product_pk', how='left')
 
         # Drop rows where essential merge keys might be missing after left joins
-        # (e.g., if a customer_pk or product_pk in fact_sales doesn't exist in dims)
         sales_data.dropna(subset=['product_name', 'purchase_address'], inplace=True) # Ensure product_name/address exist
 
         # --- Convert 'order_date' to datetime ---
-        # Ensure 'order_date' is datetime after potential merge and NaT handling
         sales_data['order_date'] = pd.to_datetime(sales_data['order_date'], errors='coerce')
         sales_data.dropna(subset=['order_date'], inplace=True) # Drop rows if order_date became NaT
 
