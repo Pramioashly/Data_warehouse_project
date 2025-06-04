@@ -20,6 +20,7 @@ def get_database_engine():
         # Test connection
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
+        st.success("Successfully connected to the database!") # Add a success message
         return engine
     except Exception as e:
         st.error(f"Error connecting to the database: {e}")
@@ -50,42 +51,53 @@ def main():
 
     # --- Navigation Sidebar ---
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Sales Overview", "View Datasets"])
+    page = st.sidebar.radio("Go to", ["Sales Overview", "View Datasets"]) # Moved inside main()
 
-    # Load data once at the start
+    # Load data once at the start of main()
     fact_sales, dim_customer, dim_product = load_data()
+
+    # Centralized check for empty dataframes
+    if fact_sales.empty or dim_customer.empty or dim_product.empty:
+        st.warning("No data available to display. Please check database connection and ensure data has been loaded using `load.py`.")
+        # If no data, stop here for charts and dataset view will show empty.
+        # No need for st.stop() or return pd.DataFrame() inside the if page == "Sales Overview" block
+        # as the warning handles it.
+        if page == "Sales Overview": # Only show this for the dashboard view
+            return # Exit main if no data and on sales overview page
 
     if page == "Sales Overview":
         st.header("Sales Overview")
 
-        # Check if data was loaded successfully before proceeding with charts
-        if fact_sales.empty or dim_customer.empty or dim_product.empty:
-            st.warning("No data available to display charts. Please check database connection and data loading process.")
-            return # Exit if data is empty
-
         # --- Merge DataFrames for analysis ---
-        sales_data = pd.merge(fact_sales, dim_customer, on='customer_pk')
-        sales_data = pd.merge(sales_data, dim_product, on='product_pk')
+        sales_data = pd.merge(fact_sales, dim_customer, on='customer_pk', how='left')
+        sales_data = pd.merge(sales_data, dim_product, on='product_pk', how='left')
+
+        # Drop rows where essential merge keys might be missing after left joins
+        # (e.g., if a customer_pk or product_pk in fact_sales doesn't exist in dims)
+        sales_data.dropna(subset=['product_name', 'purchase_address'], inplace=True) # Ensure product_name/address exist
 
         # --- Convert 'order_date' to datetime ---
-        sales_data['order_date'] = pd.to_datetime(sales_data['order_date'])
+        # Ensure 'order_date' is datetime after potential merge and NaT handling
+        sales_data['order_date'] = pd.to_datetime(sales_data['order_date'], errors='coerce')
+        sales_data.dropna(subset=['order_date'], inplace=True) # Drop rows if order_date became NaT
+
 
         # --- 1. Total Sales Over Time (Line Chart) ---
         st.subheader("Total Sales Over Time")
         daily_sales = sales_data.groupby(sales_data['order_date'].dt.date)['total_amount'].sum().reset_index()
         daily_sales.columns = ['order_date', 'total_sales']
         fig_sales_over_time = px.line(daily_sales, x='order_date', y='total_sales',
-                                      title='Daily Total Sales',
-                                      labels={'total_sales': 'Total Sales Amount', 'order_date': 'Order Date'})
-        st.plotly_chart(fig_sales_over_time, use_container_width=True) # use_container_width for better fit
+                                       title='Daily Total Sales',
+                                       labels={'total_sales': 'Total Sales Amount', 'order_date': 'Order Date'})
+        st.plotly_chart(fig_sales_over_time, use_container_width=True)
 
         # --- 2. Sales by Product (Bar Chart) ---
         st.subheader("Sales by Product")
         product_sales = sales_data.groupby('product_name')['total_amount'].sum().sort_values(ascending=False).head(10).reset_index()
         product_sales.columns = ['product_name', 'total_sales']
         fig_sales_by_product = px.bar(product_sales, x='total_sales', y='product_name', orientation='h', # horizontal bars
-                                      title='Top 10 Products by Total Sales',
-                                      labels={'total_sales': 'Total Sales Amount', 'product_name': 'Product Name'})
+                                       title='Top 10 Products by Total Sales',
+                                       labels={'total_sales': 'Total Sales Amount', 'product_name': 'Product Name'})
         fig_sales_by_product.update_layout(yaxis={'categoryorder':'total ascending'}) # Order bars from smallest to largest
         st.plotly_chart(fig_sales_by_product, use_container_width=True)
 
@@ -94,8 +106,8 @@ def main():
         product_quantity = sales_data.groupby('product_name')['quantity'].sum().sort_values(ascending=False).head(10).reset_index()
         product_quantity.columns = ['product_name', 'quantity_sold']
         fig_quantity_by_product = px.bar(product_quantity, x='quantity_sold', y='product_name', orientation='h', # horizontal bars
-                                         title='Top 10 Products by Quantity Sold',
-                                         labels={'quantity_sold': 'Quantity Sold', 'product_name': 'Product Name'})
+                                           title='Top 10 Products by Quantity Sold',
+                                           labels={'quantity_sold': 'Quantity Sold', 'product_name': 'Product Name'})
         fig_quantity_by_product.update_layout(yaxis={'categoryorder':'total ascending'}) # Order bars from smallest to largest
         st.plotly_chart(fig_quantity_by_product, use_container_width=True)
 
