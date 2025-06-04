@@ -1,1 +1,1 @@
-DATABASE: https://data-warehouse-project-1.onrender.com/
+DASHBOARD: https://data-warehouse-project-1.onrender.com/
